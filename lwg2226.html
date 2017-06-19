@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>wstring_convert methods do not take allocator instance</title>
+<meta charset="utf-8">
+<meta name="author" content="Glen Joseph Fernandes">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+ins { background-color: #CCFFCC; }
+</style>
+</head>
+<body>
+<p><strong>Issue Number:</strong> 2226<br>
+<strong>Date:</strong> 2012-12-14<br>
+<strong>Project:</strong> Programming Language C++<br>
+<strong>Audience:</strong> Library Working Group<br>
+<strong>Author:</strong> Glen Fernandes
+(<a href="mailto:glenjofe@gmail.com">glenjofe@gmail.com</a>)</p>
+<h1>wstring_convert methods do not take allocator instance</h1>
+<h2>Discussion</h2>
+<p>The <code>wstring_convert</code> class template, described in 22.3.3.2.2
+[conversions.string], does not support custom stateful allocators. It only
+supports custom stateless allocators.</p>
+<p>The <code>to_bytes</code> member function returns
+<code>basic_string&lt;char, char_traits&lt;char&gt;, Byte_alloc&gt;</code> but
+it does not take an instance of <code>Byte_alloc</code> to pass to the
+constructor of the <code>basic_string</code>.</p>
+<p>Similarly the <code>from_bytes</code> member function returns
+<code>basic_string&lt;Elem, char_traits&lt;Elem&gt;, Wide_alloc&gt;</code> but
+it does not take an instance of <code>Wide_alloc</code> to pass to the
+constructor of the <code>basic_string</code>.</p>
+<p>This makes these two member functions and the <code>wstring_convert</code>
+class template not usable when <code>Wide_alloc</code> or
+<code>Byte_alloc</code> are stateful allocators.</p>
+<h2>Proposed resolution</h2>
+<p>This wording is relative to N3485.</p>
+<p>1. In 22.3.3.2.2 [conversions.string]/2 and /6 "Class template
+<code>wstring_convert</code> synopsis" change the overloads of the member
+function <code>from_bytes()</code> so that all four overloads take an
+additional parameter which is an instance of <code>Wide_alloc</code>:</p>
+<blockquote><code>
+wide_string from_bytes(char byte<ins>,
+const Wide_alloc&amp; alloc = Wide_alloc()</ins>);<br>
+wide_string from_bytes(const char *ptr<ins>,
+const Wide_alloc&amp; alloc = Wide_alloc()</ins>);<br>
+wide_string from_bytes(const byte_string&amp; str<ins>,
+const Wide_alloc&amp; alloc = Wide_alloc()</ins>);<br>
+wide_string from_bytes(const char *first, const char *last<ins>,
+const Wide_alloc&amp; alloc = Wide_alloc()</ins>);
+</code></blockquote>
+<p>2. In 22.3.3.2.2 [conversions.string]/8 specify that this
+<code>Wide_alloc</code> allocator parameter is used to construct the
+<code>wide_string</code> object returned from the function:</p>
+<blockquote>
+<p>-8- In all cases:</p>
+<ul>
+<li><p>If the <code>cvtstate</code> object was not constructed with an explicit
+value, it shall be set to its default value (the initial conversion state)
+before the conversion begins. Otherwise it shall be left unchanged.</p></li>
+<li><p>The number of input elements successfully converted shall be stored in
+<code>cvtcount</code>.</p></li>
+<li><p><ins>The <code>Wide_alloc</code> allocator parameter is used to
+construct the <code>wide_string</code> object returned from the
+function.</ins></p></li>
+</ul>
+</blockquote>
+<p>3. In 22.3.3.2.2 [conversions.string]/2 and /12 "Class template
+<code>wstring_convert</code> synopsis" change the overloads of the member
+function <code>to_bytes()</code> so that all four overloads take an additional
+parameter which is an instance of <code>Byte_alloc</code>:</p>
+<blockquote><code>
+byte_string to_bytes(Elem wchar<ins>,
+const Byte_alloc&amp; alloc = Byte_alloc()</ins>);<br>
+byte_string to_bytes(const Elem *wptr<ins>,
+const Byte_alloc&amp; alloc = Byte_alloc()</ins>);<br>
+byte_string to_bytes(const wide_string&amp; wstr<ins>,
+const Byte_alloc&amp; alloc = Byte_alloc()</ins>);<br>
+byte_string to_bytes(const Elem *first, const Elem *last<ins>,
+const Byte_alloc&amp; alloc = Byte_alloc()</ins>);
+</code></blockquote>
+<p>4. In 22.3.3.2.2 [conversions.string]/13 specify that this
+<code>Byte_alloc</code> allocator parameter is used to construct the
+<code>byte_string</code> object returned from the function:</p>
+<blockquote>
+<p>-13- In all cases:</p>
+<ul>
+<li><p>If the <code>cvtstate</code> object was not constructed with an explicit
+value, it shall be set to its default value (the initial conversion state)
+before the conversion begins. Otherwise it shall be left unchanged.</p></li>
+<li><p>The number of input elements successfully converted shall be stored in
+<code>cvtcount</code>.</p></li>
+<li><p><ins>The <code>Byte_alloc</code> allocator parameter is used to
+construct the <code>byte_string</code> object returned from the
+function.</ins></p></li>
+</ul>
+</blockquote>
+</body>
+</html>
