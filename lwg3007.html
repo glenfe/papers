@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>allocate_shared should rebind allocator to cv-unqualified value_type
+for construction</title>
+<meta charset="utf-8">
+<meta name="author" content="Glen Joseph Fernandes">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+ins { background-color: #CCFFCC; }
+</style>
+</head>
+<body>
+<p><strong>Issue Number:</strong> 3007<br>
+<strong>Date:</strong> 2017-08-06<br>
+<strong>Project:</strong> Programming Language C++<br>
+<strong>Audience:</strong> Library Working Group<br>
+<strong>Author:</strong> Glen Joseph Fernandes
+(<a href="mailto:glenjofe@gmail.com">glenjofe@gmail.com</a>)</p>
+<h1>allocate_shared should rebind allocator to cv-unqualified value_type for
+construction</h1>
+<h2>Discussion</h2>
+<p>The remarks for the <code>allocate_shared</code> family of functions specify
+that when constructing a (sub)object of type <code>U</code>, it uses a rebound
+copy of the allocator <code>a</code> passed to <code>allocate_shared</code>
+such that its <code>value_type</code> is <code>U</code>. However <code>U</code>
+can be a <code>const</code> or <code>volatile</code> qualified type, and
+[allocator.requirements] specify that the <code>value_type</code> must be
+<em>cv</em>-unqualified.</p>
+<h2>Proposed resolution</h2>
+<p>This resolution is relative to N4687.</p>
+<p>1. Edit 23.11.2.2.6 [util.smartptr.shared.create]/7 as indicated:</p>
+<blockquote>
+<p>(7.5) &mdash; When a (sub)object of a non-array type <code>U</code> is
+specified to have an initial value of <code>v</code>, or <code>U(l...)</code>,
+where <code>l...</code> is a list of constructor arguments,
+<code>allocate_shared</code> shall initialize this (sub)object via the
+expression</p>
+<ol style="list-style-type:none">
+<li><p>(7.5.1) &mdash;
+<code>allocator_traits&lt;A2&gt;::construct(a2, pv, v)</code> or</p></li>
+<li><p>(7.5.2) &mdash;
+<code>allocator_traits&lt;A2&gt;::construct(a2, pv, l...)</code></p></li>
+</ol>
+<p>respectively, where <code>pv</code> points to storage suitable to hold an
+object of type <code>U</code> and <code>a2</code> of type <code>A2</code> is a
+rebound copy of the allocator a passed to <code>allocate_shared</code> such
+that its <code>value_type</code> is
+<code><ins>remove_cv_t&lt;</ins>U<ins>&gt;</ins></code>.</p>
+<p>(7.6) &mdash; When a (sub)object of non-array type <code>U</code> is
+specified to have a default initial value, <code>make_shared</code> shall
+initialize this (sub)object via the expression <code>::new(pv) U()</code>,
+where <code>pv</code> has type <code>void*</code> and points to storage
+suitable to hold an object of type <code>U</code>.</p>
+<p>(7.7) &mdash; When a (sub)object of non-array type <code>U</code> is
+specified to have a default initial value, <code>allocate_shared</code> shall
+initialize this (sub)object via the expression
+<code>allocator_traits&lt;A2&gt;::construct(a2, pv)</code>, where
+<code>pv</code> points to storage suitable to hold an object of type
+<code>U</code> and <code>a2</code> of type <code>A2</code> is a rebound copy of
+the allocator a passed to <code>allocate_shared</code> such that its
+<code>value_type</code> is
+<code><ins>remove_cv_t&lt;</ins>U<ins>&gt;</ins></code>.</p>
+</blockquote>
+</body>
+</html>
