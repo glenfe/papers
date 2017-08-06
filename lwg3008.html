@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>make_shared (sub)object destruction semantics are not specified</title>
+<meta charset="utf-8">
+<meta name="author" content="Glen Joseph Fernandes">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+ins { background-color: #CCFFCC; }
+</style>
+</head>
+<body>
+<p><strong>Issue Number:</strong> 3008<br>
+<strong>Date:</strong> 2017-08-06<br>
+<strong>Project:</strong> Programming Language C++<br>
+<strong>Audience:</strong> Library Working Group<br>
+<strong>Author:</strong> Glen Joseph Fernandes
+(<a href="mailto:glenjofe@gmail.com">glenjofe@gmail.com</a>)</p>
+<h1>make_shared (sub)object destruction semantics are not specified</h1>
+<h2>Discussion</h2>
+<p>The remarks for the <code>make_shared</code> and
+<code>allocate_shared</code> functions do not specify how the objects managed
+by the returned <code>shared_ptr</code> are destroyed. It is implied that when
+objects are constructed via a placement new expression, they are destroyed by
+calling the destructor, and that when objects are constructed via an allocator,
+they are destroyed using that allocator. This should be explicitly
+specified.</p>
+<h2>Proposed resolution</h2>
+<p>This resolution is relative to N4687.</p>
+<p>1. Edit 23.11.2.2.6 [util.smartptr.shared.create]/7 as indicated:</p>
+<blockquote>
+<p>(7.9) &mdash; When the lifetime of the object managed by the return
+value ends, or when the initialization of an array element throws an exception,
+the initialized elements should be destroyed in the reverse order of their
+construction.</p>
+<p><ins>(7.10) &mdash; When a (sub)object of a non-array type <code>U</code>
+that was initialized by <code>make_shared</code> is to be destroyed, it shall
+be destroyed via the expression <code>pv-&gt;~U()</code> where <code>pv</code>
+points to an object of type <code>U</code>.</ins></p>
+<p><ins>(7.11) &mdash; When a (sub)object of a non-array type <code>U</code>
+that was initialized by <code>allocate_shared</code> is to be destroyed, it
+shall be destroyed via the expression
+<code>allocator_traits&lt;A2&gt;::destroy(a2, pv)</code> where <code>pv</code>
+points to an object of type <em>cv</em>-unqualified <code>U</code> and
+<code>a2</code> of type <code>A2</code> is a rebound copy of the allocator
+<code>a</code> passed to <code>allocate_shared</code> such that its
+<code>value_type</code> is <code>remove_cv_t&lt;U&gt;</code>.</ins></p>
+</blockquote>
+</body>
+</html>
