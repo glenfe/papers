@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Utility to convert a pointer to a raw pointer</title>
+<meta charset="utf-8">
+<meta name="author" content="Glen Joseph Fernandes">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+ins { background-color: #CCFFCC; }
+.insert { background-color: #CCFFCC; }
+</style>
+</head>
+<body>
+<p><strong>Document Number:</strong> P0653R2<br>
+<strong>Date:</strong> 2017-11-09<br>
+<strong>Project:</strong> Programming Language C++<br>
+<strong>Audience:</strong> Library Working Group<br>
+<strong>Author:</strong> Glen Joseph Fernandes
+(<a href="mailto:glenjofe@gmail.com">glenjofe@gmail.com</a>)</p>
+<h1>Utility to convert a pointer to a raw pointer</h1>
+<p>This paper proposes adding a new function <code>to_address</code> to obtain
+a raw pointer from an object of a pointer-like type, and an optional
+customization point in class template <code>pointer_traits</code> via a member
+function of the same name.</p>
+<h2>Changes in Revision 2</h2>
+<p>Prevented use with functions, made the raw pointer overload
+<code>constexpr</code>, and other minor changes to wording suggested by STL
+during the LWG review.</p>
+<h2>Changes in Revision 1</h2>
+<p>Provided a free function that uses a <code>pointer_traits</code> member
+function only if it exists. This preserves compatibility for any user
+specializations of <code>pointer_traits</code> that do not define a
+<code>to_address</code> member function.</p>
+<h2>Motivation</h2>
+<p>It is often necessary to obtain a raw pointer from an object of any
+pointer-like type. One common use is writing allocator-aware code where an
+allocator's <code>pointer</code> member type is not a raw pointer type.</p>
+<p>Typically the expression <code>addressof(*p)</code> is used but this is not
+well-defined when <code>p</code> does not reference storage that has an object
+constructed in it. This means that using this expression to obtain a raw
+pointer for the purpose of constructing an object (e.g. via a placement
+<em>new-expression</em> or via an allocator) is incorrect.</p>
+<p>A common example of such code:</p>
+<blockquote>
+<code>auto p = a.allocate(1);<br>
+std::allocator_traits&lt;A&gt;::construct(a, std::addressof(*p), v);</code>
+</blockquote>
+<p>The correct code now looks like:</p>
+<blockquote>
+<code>auto p = a.allocate(1);<br>
+std::allocator_traits&lt;A&gt;::construct(a, std::to_address(p), v);</code>
+</blockquote>
+<p>To customize the behavior of this function for a pointer-like type, users
+can specialize <code>pointer_traits</code> for that type and define member
+function <code>to_address</code> accordingly.</p>
+<h3>Existing practice</h3>
+<p>Typically implementors work around this problem by defining a utility like
+the following:</p>
+<blockquote>
+<code>template &lt;class Ptr&gt;<br>
+auto to_address(const Ptr&amp; p) noexcept<br>
+{<br>
+&nbsp; return to_address(p.operator-&gt;());<br>
+}<br>
+<br>
+template &lt;class T&gt;<br>
+T* to_address(T* p) noexcept<br>
+{<br>
+&nbsp; return p;<br>
+}</code>
+</blockquote>
+<p>This proposal provides a standard library solution, with an optional
+customization point.</p>
+<h3>Why pointer_traits?</h3>
+<p>The C++ standard library already provides <code>pointer_traits</code>
+for supporting pointer-like types and this <code>to_address</code> is the
+natural inverse of its <code>pointer_to</code> member function.</p>
+<h2>Implementation</h2>
+<p>The <a href="http://www.boost.org/">Boost</a> C++ library collection now
+contains an implementation of an earlier revision of this proposal in the Core
+library. That <code>boost::pointer_traits</code> implementation is used by
+several Boost libraries, starting with the 1.65 release.</p>
+<h2>Proposed Wording</h2>
+<p>All changes are relative to <a href="#N4640">N4640</a>.</p>
+<p>1. Insert into 20.10.2 [memory.syn] as follows:</p>
+<blockquote>
+<code>
+// 20.10.3, pointer traits<br>
+template &lt;class Ptr&gt; struct pointer_traits;<br>
+template &lt;class T&gt; struct pointer_traits&lt;T*&gt;;<br>
+<br>
+<ins>// 20.10.4, pointer conversion<br>
+template &lt;class Ptr&gt; auto to_address(const Ptr&amp; p) noexcept;<br>
+template &lt;class T&gt; constexpr T* to_address(T* p) noexcept;</ins>
+</code>
+</blockquote>
+<p>2. Insert after 20.10.3 [pointer.traits] as follows:</p>
+<blockquote class="insert">
+<strong>20.10.4 Pointer conversion [pointer.conversion]</strong>
+<dl>
+<dt><code>template &lt;class Ptr&gt; auto to_address(const Ptr&amp; p)
+noexcept;</code></dt>
+<dd>
+<p><em>Returns:</em>
+<code>pointer_traits&lt;Ptr&gt;::to_address(p)</code> if that expression is
+well-formed, otherwise <code>to_address(p.operator-&gt;())</code>.</p>
+</dd>
+</dl>
+<dl>
+<dt><code>template &lt;class T&gt; constexpr T* to_address(T* p)
+noexcept;</code></dt>
+<dd>
+<p><em>Requires:</em> <code>T</code> is not a function type. Otherwise
+the program is ill-formed.</p>
+<p><em>Returns:</em> <code>p</code>.</p>
+</dd>
+</dl>
+</blockquote>
+<p>3. Add to 20.10.3.1 [pointer.traits.functions] as follows:</p>
+<blockquote class="insert">
+<dl>
+<dt><code>static element_type* to_address(pointer p)
+noexcept;</code></dt>
+<dd>
+<p><em>Remarks:</em> It is optional for specializations to define this
+static member function.</p>
+<p><em>Returns:</em> A pointer of type <code>element_type*</code> that
+references the same location as the argument <code>p</code>.</p>
+<p>[Note: This function should be the inverse of
+<code>pointer_to</code>. Specializations can define this function to customize
+<code>to_address</code> [pointer.conversion]. &mdash; end note]</p>
+</dd>
+</dl>
+</blockquote>
+<h2>Acknowledgments</h2>
+<p>Peter Dimov, Jonathan Wakely, and Howard Hinnant helped shape the revised
+proposal. Peter Dimov suggested the better design as well as reviewed the
+implementation and tests of the Boost version. Jonathan Wakely pointed out the
+issue that motivated this proposal. Michael Spencer and Joel Falcou reviewed
+this paper.</p>
+<h2>References</h2>
+<ul>
+<li id="#N4640">N4640, Working Draft, Standard for Programming Language C++,
+<br>
+<a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/n4640.pdf">
+http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/n4640.pdf</a>
+</li>
+</ul>
+</body>
+</html>
