@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Smart pointer creation with default initialization</title>
+<meta charset="utf-8">
+<meta name="author" content="Glen Joseph Fernandes">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+ins { background-color: #CCFFCC; }
+del { background-color: #FFCCCC; }
+.insert { background-color: #CCFFCC; }
+</style>
+</head>
+<body>
+<p><strong>Document Number:</strong> P1020R1<br>
+<strong>Date:</strong> 2018-11-06<br>
+<strong>Project:</strong> Programming Language C++<br>
+<strong>Audience:</strong> Library Working Group<br>
+<strong>Author:</strong> Glen Joseph Fernandes
+(<a href="mailto:glenjofe@gmail.com">glenjofe@gmail.com</a>),
+Peter Dimov
+(<a href="mailto:pdimov@pdimov.com">pdimov@pdimov.com</a>)</p>
+<h1>Smart pointer creation with default initialization</h1>
+<p>This paper proposes adding the smart pointer creation functions
+<code>allocate_shared_default_init</code>,
+<code>make_shared_default_init</code>, and
+<code>make_unique_default_init</code> that perform default initialization.</p>
+<h2>Changes in Revision 1</h2>
+<p>Minor changes to the proposed wording suggested in the LWG review.</p>
+<h2>Motivation</h2>
+<p>It is not uncommon for arrays of built-in types such as <code>unsigned
+char</code> or <code>double</code> to be immediately initialized by the user in
+their entirety after allocation. In these cases, the value initialization
+performed by <code>allocate_shared</code>, <code>make_shared</code>, and
+<code>make_unique</code> is redundant and hurts performance, and a way to
+choose default initialization is needed.</p>
+<h2>Implementation</h2>
+<p>The Boost <a href="http://www.boost.org/libs/smart_ptr">Smart Pointers</a>
+library has provided an implementation of this proposal since Boost 1.56
+released in 2014. The Boost functions are named
+<code>allocate_shared_noinit</code>, <code>make_shared_noinit</code>, and
+<code>make_unique_noinit</code>, and are in widespread use.</p>
+<h2>Proposed Wording</h2>
+<p>All changes are relative to <a href="#N4741">N4741</a>.</p>
+<p>Insert into 23.10.2 [memory.syn] as follows:</p>
+<blockquote>
+<code>template&lt;class T, class... Args&gt; unique_ptr&lt;T&gt;
+make_unique(Args&amp;&amp;... args); //<em>T is not array</em><br>
+template&lt;class T&gt; unique_ptr&lt;T&gt; make_unique(size_t n);
+//<em>T is U[]</em><br>
+template&lt;class T, class... Args&gt; <em>unspecified</em>
+make_unique(Args&amp;&amp;...) = delete; //<em>T is U[N]</em><br>
+<br>
+<ins>template&lt;class T&gt; unique_ptr&lt;T&gt;
+make_unique_default_init(); //<em>T is not array</em><br>
+template&lt;class T&gt; unique_ptr&lt;T&gt; make_unique_default_init(size_t n);
+//<em>T is U[]</em><br>
+template&lt;class T, class... Args&gt; <em>unspecified</em>
+make_unique_default_init(Args&amp;&amp;...) = delete;
+//<em>T is U[N]</em></ins></code><br>
+[&hellip;]<br>
+<code>template&lt;class T&gt; shared_ptr&lt;T&gt;
+make_shared(const remove_extent_t&lt;T&gt;&amp; u); //<em>T is U[N]</em><br>
+template&lt;class T&gt; shared_ptr&lt;T&gt; allocate_shared(const A&amp; a,
+const remove_extent_t&lt;T&gt;&amp; u); //<em>T is U[N]</em><br>
+<br>
+<ins>template&lt;class T&gt; shared_ptr&lt;T&gt; make_shared_default_init();
+//<em>T is not U[]</em><br>
+template&lt;class T&gt; shared_ptr&lt;T&gt;
+allocate_shared_default_init(const A&amp; a); //<em>T is not U[]</em><br>
+<br>
+template&lt;class T&gt; shared_ptr&lt;T&gt; make_shared_default_init(size_t N);
+//<em>T is U[]</em><br>
+template&lt;class T&gt; shared_ptr&lt;T&gt;
+allocate_shared_default_init(const A&amp; a, size_t N);
+//<em>T is U[]</em></ins></code>
+</blockquote>
+<p>Insert after 23.11.1.4 [unique.ptr.create] p5 as follows:</p>
+<blockquote class="insert">
+<dl>
+<dt><code>template&lt;class T&gt; unique_ptr&lt;T&gt;
+make_unique_default_init();</code></dt>
+<dd>
+<p><em>Constraints:</em> <code>T</code> is not an array.</p>
+<p><em>Returns:</em> <code>unique_ptr&lt;T&gt;(new T)</code>.</p>
+</dd>
+<dt><code>template&lt;class T&gt; unique_ptr&lt;T&gt;
+make_unique_default_init(size_t n);</code></dt>
+<dd>
+<p><em>Constraints:</em> <code>T</code> is an array of unknown bound.</p>
+<p><em>Returns:</em> <code>unique_ptr&lt;T&gt;(new
+remove_extent_t&lt;T&gt;[n])</code>.</p>
+</dd>
+<dt><code>template&lt;class T, class... Args&gt; <em>unspecified</em>
+make_unique_default_init(Args&amp;&amp;...) = delete;</code></dt>
+<dd>
+<p><em>Constraints:</em> <code>T</code> is an array of known bound.</p>
+</dd>
+</dl>
+</blockquote>
+<p>Change 23.11.3.6 [util.smartptr.shared.create] p1 as follows:</p>
+<blockquote>
+<p>The common requirements that apply to all
+<code>make_shared</code><ins>,</ins><del>and</del>
+<code>allocate_shared</code><ins>, <code>make_shared_default_init,</code> and
+<code>allocate_shared_default_init</code></ins> overloads, unless specified
+otherwise, are described below.</p>
+<code>template&lt;class T, ...&gt; shared_ptr&lt;T&gt;
+make_shared(<em>args</em>);<br>
+template&lt;class T, class A, ...&gt; shared_ptr&lt;T&gt;
+allocate_shared(const A&amp; a, <em>args</em>);<br>
+<ins>template&lt;class T, ...&gt; shared_ptr&lt;T&gt;
+make_shared_default_init(<em>args</em>);<br>
+template&lt;class T, class A, ...&gt; shared_ptr&lt;T&gt;
+allocate_shared_default_init(const A&amp; a, <em>args</em>);</ins></code>
+</blockquote>
+<p>Change 23.11.3.6 [util.smartptr.shared.create] p3 as follows:</p>
+<blockquote>
+<em>Effects:</em> Allocates memory for an object of type <code>T</code> (or
+<code>U[N]</code> when <code>T</code> is <code>U[]</code>, where <code>N</code>
+is determined from <code>args</code> as specified by the concrete overload).
+The object is initialized from <code><em>args</em></code> as specified by the
+concrete overload. The <code>allocate_shared</code> <ins>and
+<code>allocate_shared_default_init</code></ins> templates use a copy of
+<code>a</code> (rebound for an unspecified <code>value_type</code>) to allocate
+memory. If an exception is thrown, the functions have no effect.
+</blockquote>
+<p>Insert after 23.11.3.6 [util.smartptr.shared.create] p7.7 as follows:</p>
+<blockquote class="insert">
+&mdash; When a (sub)object of non-array type <code>U</code> is initialized
+by <code>make_shared_default_init</code> or
+<code>allocate_shared_default_init</code>, it is initialized via the expression
+<code>::new(pv) U</code>, where <code>pv</code> has type <code>void*</code> and
+points to storage suitable to hold an object of type <code>U</code>.
+</blockquote>
+<p>Insert after 23.11.3.6 [util.smartptr.shared.create] p22 as follows:</p>
+<blockquote class="insert">
+<dl>
+<dt><code>template&lt;class T&gt; shared_ptr&lt;T&gt;
+make_shared_default_init();<br>
+template&lt;class T, class A&gt; shared_ptr&lt;T&gt;
+allocate_shared_default_init(const A&amp; a);</code></dt>
+<dd>
+<p><em>Constraints:</em> <code>T</code> is not an array of unknown bound.</p>
+<p><em>Returns:</em> A <code>shared_ptr</code> to an object of type
+<code>T</code>.</p>
+<p>[<em>Example:</em><br>
+<br>
+<code>struct X { double data[1024]; };<br>
+shared_ptr&lt;X&gt; p =
+make_shared_default_init&lt;X&gt;();<br>
+//<em>shared_ptr to a default-initialized X, where each element in X::data has
+an indeterminate value</em></code><br>
+<br>
+<code>shared_ptr&lt;double[1024]&gt; q =
+make_shared_default_init&lt;double[1024]&gt;();<br>
+//<em>shared_ptr to a default-initialized double[1024], where each element has
+an indeterminate value</em></code><br>
+<br>
+&mdash;<em>end example</em>]</p>
+</dd>
+<dt><code>template&lt;class T&gt; shared_ptr&lt;T&gt;
+make_shared_default_init(size_t N);<br>
+template&lt;class T, class A&gt; shared_ptr&lt;T&gt;
+allocate_shared_default_init(const A&amp; a, size_t N);</code></dt>
+<dd>
+<p><em>Constraints:</em> <code>T</code> is an array of unknown bound.</p>
+<p><em>Returns:</em> A <code>shared_ptr</code> to an object of type
+<code>U[N]</code>, where <code>U</code> is
+<code>remove_extent_t&lt;T&gt;</code>.</p>
+<p>[<em>Example:</em><br>
+<br>
+<code>shared_ptr&lt;double[]&gt; p =
+make_shared_default_init&lt;double[]&gt;(1024);<br>
+//<em>shared_ptr to a default-initialized double[1024], where each element has
+an indeterminate value</em></code><br>
+<br>
+&mdash;<em>end example</em>]</p>
+</dd>
+</dl>
+</blockquote>
+<h2>References</h2>
+<ul>
+<li id="N4741">N4741, Working Draft, Standard for Programming Language C++,
+<br>
+<a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/n4741.pdf">
+http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/n4741.pdf</a>
+</li>
+</ul>
+</body>
+</html>
