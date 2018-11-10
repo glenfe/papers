@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Traits for [Un]bounded Arrays</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+ins { background-color: #CCFFCC; }
+del { background-color: #FFCCCC; }
+.insert { background-color: #CCFFCC; }
+.edit { background-color: #F0F0F0; }
+</style>
+</head>
+<body>
+<p><strong>Document Number:</strong> P1357R1<br>
+<strong>Date:</strong> 2019-02-22<br>
+<strong>Project:</strong> Programming Language C++<br>
+<strong>Audience:</strong> Library Working Group<sup>1</sup><br>
+<strong>Authors:</strong> Walter E. Brown
+(<a href="mailto:webrown.cpp@gmail.com">webrown.cpp@gmail.com</a>),
+Glen Joseph Fernandes
+(<a href="mailto:glenjofe@gmail.com">glenjofe@gmail.com</a>)</p>
+<h1>Traits for [Un]bounded Arrays</h1>
+<p><strong>Abstract:</strong> This paper proposes two new type traits that have
+been demonstrated, in prior art, to provide a useful partition of the types for
+which the <code>is_array</code> trait holds. The proposed partition is
+analogous to that provided, when <code>is_integral</code> holds, by the
+<code>is_signed</code>/<code>is_unsigned</code> traits.</p>
+<h2>Introduction and background</h2>
+<p>The type traits known as <em>primary type categories</em><sup>2</sup> serve
+to partition the universe of C++ types into fourteen mutually exclusive
+categories such that each type falls into exactly one category. In addition, we
+have <em>composite type traits</em><sup>3</sup> to identify useful combinations
+of these primary type categories. Finally, we have current and past
+examples<sup>4</sup> of traits providing even more finely-grained
+categorization.</p>
+<p>This paper proposes to add two new type traits of this last kind, for each
+of which there is significant prior art. The proposed traits will provide a
+useful partition of types for which <code>is_array</code> holds.</p>
+<h2>Discussion and proposal</h2>
+<p>It is often necessary to distinguish types that are arrays of unknown bound
+(i.e., where <code>T</code> is of the form <code>U[]</code>) from types that
+are arrays of known bound (i.e., where <code>T</code> is of the form
+<code>U[N]</code>) instead of just any array type. For example, such
+distinctions are needed in the implementation of certain C++ standard library
+facilities:</p>
+<ul>
+<li><code>std::unique_ptr</code> and <code>std::make_unique</code>: these
+support use with arrays of unknown bound, but intentionally prohibit use with
+arrays of known bound.</li>
+<li><code>std::make_shared</code> and <code>std::allocate_shared</code>: these
+provide different overloads for arrays of known bounds as well as for arrays of
+unknown bound.</li>
+</ul>
+<p>Beyond use in implementation, it would also be useful to have these traits
+in the standard library for the specifications of other facilities in the C++
+standard. Several constraints could then be specified by a C++ expression using
+traits, instead of by the equivalent (but less succinct) English prose.</p>
+<p>We therefore propose to add two new traits named
+<code>is_bounded_array</code> and <code>is_unbounded_array</code>. Other
+possible name pairs for these traits include (a) <code>is_bound_array</code>
+and <code>is_unbound_array</code>, (b) <code>is_known_bound_array</code> and
+<code>is_unknown_bound_array</code>, or (c) <code>is_known_extent_array</code>
+and <code>is_unknown_extent_array</code>.</p>
+<p>Using these traits, wording for the following constraints in the C++
+standard could be consistently simplified:</p>
+<table>
+<tr><th>Wording of this form</th><th>Could take this form instead</th></tr>
+<tr><td><code>T</code> is not an array</td>
+<td><code>!is_array_v&lt;T&gt;</code></td></tr>
+<tr><td><code>T</code> is an array of known bound</td>
+<td><code>is_bounded_array_v&lt;T&gt;</code></td></tr>
+<tr><td><code>T</code> is not an array of unknown bound</td>
+<td><code>!is_unbounded_array_v&lt;T&gt;</code></td></tr>
+<tr><td><code>T</code> is an array of unknown bound</td>
+<td><code>is_unbounded_array_v&lt;T&gt;</code></td></tr>
+</table>
+<p>No such rewording is herein proposed; we simply provide the above
+possibilities by way of example and of motivation.</p>
+<h2>Sample implementation</h2>
+<p>Implementing the proposed traits is straightforward. Here is one possible
+approach:</p>
+<blockquote class="edit">
+<code>
+template&lt;typename&gt;<br>
+struct is_bounded_array : false_type { };<br>
+<br>
+template&lt;typename U, size_t N&gt;<br>
+struct is_bounded_array&lt;U[N]&gt; : true_type { };<br>
+<br>
+template&lt;typename T&gt;<br>
+inline constexpr bool
+is_bounded_array_v = is_bounded_array&lt;T&gt;::value;<br>
+<br>
+template&lt;typename&gt;<br>
+struct is_unbounded_array : false_type { };<br>
+<br>
+template&lt;typename U&gt;<br>
+struct is_unbounded_array&lt;U[]&gt; : true_type { };<br>
+<br>
+template&lt;typename T&gt;<br>
+inline constexpr bool
+is_unbounded_array_v = is_unbounded_array&lt;T&gt;::value;
+</code>
+</blockquote>
+<h2>Proposed wording<sup>5</sup></h2>
+<p class="edit">1. Insert the followng row into Table 35 - Standard library
+feature-test macros. Adjust the placeholder Value as needed so as to denote
+this proposal's date of adoption.</p>
+<blockquote>
+<table>
+<tr><th>Macro name</th><th>Value</th><th>Header(s)</th></tr>
+<tr><td colspan="3">[&hellip;]</td></tr>
+<tr class="insert"><td><code>__cpp_lib_bounded_array_traits</code></td>
+<td>201902L</td><td><code>&lt;type_traits&gt;</code></td></tr>
+</table>
+</blockquote>
+<p class="edit">2. Augment [meta.type.synop] as shown:</p>
+<blockquote>
+<code>
+template&lt;class T&gt; struct is_signed;<br>
+template&lt;class T&gt; struct is_unsigned;<br>
+<ins>template&lt;class T&gt; struct is_bounded_array;</ins><br>
+<ins>template&lt;class T&gt; struct is_unbounded_array;</ins><br>
+</code>
+[&hellip;]<br>
+<code>
+template&lt;class T&gt; inline constexpr bool
+is_signed_v = is_signed&lt;T&gt;::value;<br>
+template&lt;class T&gt; inline constexpr bool
+is_unsigned_v = is_unsigned&lt;T&gt;::value;<br>
+<ins>template&lt;class T&gt; inline constexpr bool
+is_bounded_array_v = is_bounded_array&lt;T&gt;::value;</ins><br>
+<ins>template&lt;class T&gt; inline constexpr bool
+is_unbounded_array_v = is_unbounded_array&lt;T&gt;::value;</ins><br>
+</code>
+</blockquote>
+<p class="edit">3. Augment Table 46 - Type property predicates as shown:</p>
+<blockquote>
+<table>
+<tr><th>Template</th><th>Condition</th><th>Preconditions</th></tr>
+<tr><td colspan="3">[&hellip;]</td></tr>
+<tr><td><code>template&lt;class T&gt; struct is_signed;</code></td>
+<td>If <code>is_arithmetic_v&lt;T&gt;</code>&hellip;</td>
+<td></td></tr>
+<tr><td><code>template&lt;class T&gt; struct is_unsigned;</code></td>
+<td>If <code>is_arithmetic_v&lt;T&gt;</code>&hellip;</td>
+<td></td></tr>
+<tr class="insert"><td><code>template&lt;class T&gt;
+struct is_bounded_array;</code></td>
+<td><code>T</code> is an array type of known bound [dcl.array]</td>
+<td></td></tr>
+<tr class="insert"><td><code>template&lt;class T&gt;
+struct is_unbounded_array;</code></td>
+<td><code>T</code> is an array type of unknown bound [dcl.array]</td>
+<td></td></tr>
+</table>
+</blockquote>
+<h2>Acknowledgments</h2>
+<p>Many thanks to the readers of early drafts of this paper for their
+thoughtful comments.</p>
+<h2>Bibliography</h2>
+<dl>
+<dt id="N2028">[N2028]</dt>
+<dd>Howard E. Hinnant: "Minor Modifications to the type traits Wording."
+ISO/IEC JTC1/SC22/WG21 document N2028 (mid-Berlin/Portland mailing),
+2006–06–12.
+<a href="https://wg21.link/n2028">https://wg21.link/n2028</a>.</dd>
+<dt id="N4778">[N4778]</dt>
+<dd>Richard Smith: "Working Draft, Standard for Programming Language C++."
+ISO/IEC JTC1/SC22/WG21 document N4778 (pre-San Diego mailing), 2018–10–08.
+<a href="https://wg21.link/n4778">https://wg21.link/n4778</a>.</dd>
+</dl>
+<h2>Document history</h2>
+<table>
+<tr><th>Rev.</th><th>Date</th><th>Changes</th></tr>
+<tr><td>-1</td><td>2018-11-09</td>
+<td>Draft uploaded to San Diego LEWG wiki for post-San Diego review.</td></tr>
+<tr><td>0</td><td>2019-01-06</td>
+<td>Added footnote and adjusted audience to reflect favorable post-San Diego
+review. Published as P1357R0, pre-Kona mailing.</td></tr>
+<tr><td>1</td><td>2019-02-22</td>
+<td>Revised per LWG guidance in Kona. Published as P1357R1, post-Kona
+mailing.</td></tr>
+</table>
+<hr>
+<ol>
+<li>At its Saturday post-San Diego session, LEWG reviewed and tentatively
+approved (9|3|2|1|0) a pre-publication draft of this paper. No substantive
+changes have been applied since then.</li>
+<li>Specified in in [meta.unary.cat]: <code>is_void</code>,
+<code>is_null_pointer</code>, <code>is_integral</code>,
+<code>is_floating_point</code>, <code>is_array</code>, <code>is_pointer</code>,
+<code>is_lvalue_reference</code>, <code>is_rvalue_reference</code>,
+<code>is_member_object_pointer</code>, <code>is_member_function_pointer</code>,
+<code>is_enum</code>, <code>is_union</code>, <code>is_class</code>, and
+<code>is_function</code>.</li>
+<li>Specified in [meta.unary.comp]: <code>is_reference</code>,
+<code>is_arithmetic</code>, <code>is_fundamental</code>,
+<code>is_object</code>, <code>is_scalar</code>, <code>is_compound</code>, and
+<code>is_member_pointer</code>.</li>
+<li>Specified in [meta.unary.prop]: <code>is_signed</code> and
+<code>is_unsigned</code>, providing a partition of types for which
+<code>is_integral</code> holds. Also, the composite trait
+<code>is_reference</code> was originally a primary trait before the
+introduction, by [<a href="#N2028">N2028</a>], of rvalue references and the
+corresponding then-new <code>is_rvalue_reference</code> trait.</li>
+<li>Proposed <ins>additions</ins> and <del>deletions</del> are relative to
+[<a href="#N4778">N4778</a>]. Editorial notes appear like
+<span class="edit">this</span>.</li>
+</ol>
+</body>
+</html>
