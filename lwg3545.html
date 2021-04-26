@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>std::pointer_traits should be SFINAE-friendly</title>
+<meta charset="utf-8">
+<meta name="author" content="Glen Joseph Fernandes">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+ins { background-color: #CCFFCC; }
+del { background-color: #FFCCCC; }
+</style>
+</head>
+<body>
+<p><strong>Issue Number:</strong> 3545<br>
+<strong>Date:</strong> 2021-04-26<br>
+<strong>Project:</strong> Programming Language C++<br>
+<strong>Audience:</strong> Library Working Group<br>
+<strong>Author:</strong> Glen Joseph Fernandes
+(<a href="mailto:glenjofe@gmail.com">glenjofe@gmail.com</a>)</p>
+<h1>std::pointer_traits should be SFINAE-friendly</h1>
+<h2>Discussion</h2>
+<p>P1474R1 chose to use <code>std::to_address</code> (a mechanism of converting
+pointer-like types to raw pointers) for contiguous iterators.
+<code>std::to_address</code> provides an optional customization point via an
+optional member in <code>std::pointer_traits</code>. However all iterators are
+not pointers, and the primary template of
+<code>std::pointer_traits&lt;Ptr&gt;</code> requires that either
+<code>Ptr::element_type</code> is valid or <code>Ptr</code> is of the form
+<code>template&lt;T, Args...&gt;</code> or the <code>pointer_traits</code>
+specialization is ill-formed. This requires specializing
+<code>pointer_traits</code> for those contiguous iterator types which is
+inconvenient for users. P1474 should have also made <code>pointer_traits</code>
+SFINAE friendly..</p>
+<h2>Proposed resolution</h2>
+<p>This resolution is relative to N4885.</p>
+<p>1. Modify 20.10.3.2 [pointer.traits.types]/1 as indicated:</p>
+<blockquote>
+<p>-<em>Type</em>: <code>Ptr::element_type</code> if the <em>qualified-id</em>
+<code>Ptr::element_type</code> is valid and denotes a type (13.10.3
+[temp.deduct]); otherwise, <code>T</code> if <code>Ptr</code> is a class
+template instantiation of the form <code>SomePointer&lt;T, Args&gt;</code>,
+where <code>Args</code> is zero or more type arguments; otherwise, the
+<del>specialization is ill-formed</del> <ins><code>pointer_traits</code> has no
+member <code>element_type</code></ins>.</p>
+</blockquote>
+</body>
+</html>
