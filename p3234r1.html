@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Utility to check if a pointer is in a given range</title>
+<meta charset="utf-8">
+<meta name="author" content="Glen Joseph Fernandes">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+ins { background-color: #CCFFCC; }
+.insert { background-color: #CCFFCC; }
+</style>
+</head>
+<body>
+<p><strong>Document Number:</strong> P3234R1<br>
+<strong>Date:</strong> 2024-04-16<br>
+<strong>Project:</strong> Programming Language C++<br>
+<strong>Audience:</strong> LEWG, EWG<br>
+<strong>Author:</strong> Glen Joseph Fernandes
+(<a href="mailto:glenjofe@gmail.com">glenjofe@gmail.com</a>)</p>
+<h1>Utility to check if a pointer is in a given range</h1>
+<p>This paper proposes adding a new function template
+<code>pointer_in_range</code>, a utility that can check if a pointer is in a
+given range, and can be used in a constant expression.</p>
+<h2>Changes in Revision 1</h2>
+<p>Added rationale for the choice of two pointer parameters instead of a single
+range parameter.</p>
+<h2>Motivation</h2>
+<p>Library authors often need this functionality and implement it themselves.
+A solution in the standard library would be more convenient, portable, optimal,
+and correct.</p>
+<h3>Common usage</h3>
+<p>A common use is determining if string ranges overlap, to be able to use a
+fast copy operation:</p>
+<blockquote>
+<code>if (!pointer_in_range(ptr, data_, data_ + size_)) {<br>
+&nbsp; std::copy(ptr, ptr + size, data_);<br>
+}</code>
+</blockquote>
+<p>Another use is allocators that first use automatic storage, falling back to
+dynamic allocation:</p>
+<blockquote>
+<code>if (!pointer_in_range(ptr, store_, store_ + size_)) {<br>
+&nbsp; ::operator delete(ptr);<br>
+}</code>
+</blockquote>
+<h3>Existing practice</h3>
+<p>This function appears in some form in many projects, including large library
+collections such as:</p>
+<ul>
+<li>libc++: <code>__is_pointer_in_range</code></li>
+<li>Qt: <code>q_points_into_range</code></li>
+<li>Boost: <code>pointer_in_range</code>, <code>ptr_in_range</code></li>
+</ul>
+<p>Other libraries contain the same check inline even if they do not define a
+function for it, such as:</p>
+<ul>
+<li>libstdc++: <code>basic_string::_M_disjunct</code></li>
+<li>BSL: <code>basic_string::privateReplaceRaw</code></li>
+<li>EASTL: <code>basic_string::replace</code></li>
+</ul>
+<h3>Imperfect solutions</h3>
+<p>Users can not implement this perfectly. For example, the following solution
+is not correct when the built-in operators for pointers do not yield a strict
+total order:</p>
+<blockquote>
+<code>template&lt;class T&gt;<br>
+bool pointer_in_range(T* ptr, T* begin, T* end)<br>
+{<br>
+&nbsp; return begin &lt;= ptr &amp;&amp; ptr &lt; end;<br>
+}</code>
+</blockquote>
+<p>The following solution uses comparisons consistent with the
+implementation-defined total order but is still not correct when two arrays
+of <code>T</code> may be interleaved:</p>
+<blockquote>
+<code>template&lt;class T&gt;<br>
+bool pointer_in_range(T* ptr, T* begin, T* end)<br>
+{<br>
+&nbsp; return std::less_equal&lt;&gt;()(begin, ptr) &amp;&amp;
+std::less&lt;&gt;()(ptr, end);<br>
+}</code>
+</blockquote>
+<p>Neither function above can be used in constant expressions. The following
+solution is correct and usable in a constant expression but is not optimal at
+runtime:</p>
+<blockquote>
+<code>template&lt;class T&gt;<br>
+constexpr bool pointer_in_range(T* ptr, T* begin, T* end)<br>
+{<br>
+&nbsp; for (; begin != end; ++begin) {<br>
+&nbsp; &nbsp; if (begin == ptr) {<br>
+&nbsp; &nbsp; &nbsp; return true;<br>
+&nbsp; &nbsp; }<br>
+&nbsp; }<br>
+&nbsp; return false;<br>
+}</code>
+</blockquote>
+<h3>Argument order</h3>
+<p>The argument order (<code>ptr</code>, <code>begin</code>, <code>end</code>)
+is consistent with English and mathematical notation:</p>
+<ul>
+<li>the pointer <code>ptr</code> is in the range [<code>begin</code>,
+<code>end</code>)</li>
+<li><code>ptr</code> &isin; [<code>begin</code>, <code>end</code>)</li>
+</ul>
+<p>This order is also consistent with other standard library names that are
+read left to right:</p>
+<ul>
+<li><code>is_base_of_v&lt;Base, Derived&gt;</code></li>
+<li><code>is_convertible_v&lt;From, To&gt;</code></li>
+<li><code>less&lt;T&gt;(lhs, rhs)</code></li>
+</ul>
+<h3>Why not span?</h3>
+<p>Span's convenience is also a double edged sword. Now it can even be
+implicitly constructed from an initializer list of two elements which
+allows:</p>
+<blockquote>
+<code>if (!pointer_in_range(p, {x, y})) {<br>
+&nbsp; // always true<br>
+}</code>
+</blockquote>
+<p>This function will typically use an intrinsic that operates on raw pointers
+and thus its interface should least inhibit the analyzer or the optimizer:</p>
+<blockquote>
+<code>template&lt;class T&gt;<br>
+constexpr bool pointer_in_range(const T* ptr, const T* begin, const T* end)<br>
+{<br>
+&nbsp; return __builtin_pointer_in_range(ptr, begin, end);<br>
+}</code>
+</blockquote>
+<h3>Header choice</h3>
+<p>The header <code>&lt;memory&gt;</code> is the home of other functionality
+for dealing with pointers such as <code>align</code> and
+<code>to_address</code>.</p>
+<h2>Implementation</h2>
+<p>The <a href="http://www.boost.org/">Boost</a> C++ library collection now
+also has the following implementation in the Core library, releasing in version
+1.86, for supported platforms.</p>
+<blockquote>
+<code>template&lt;class T&gt;<br>
+constexpr bool pointer_in_range(const T* ptr, const T* begin, const T* end)<br>
+{<br>
+&nbsp; if (std::is_constant_evaluated()) {<br>
+&nbsp; &nbsp; for (; begin != end; ++begin) {<br>
+&nbsp; &nbsp; &nbsp; if (begin == ptr) {<br>
+&nbsp; &nbsp; &nbsp; &nbsp; return true;<br>
+&nbsp; &nbsp; &nbsp; }<br>
+&nbsp; &nbsp; }<br>
+&nbsp; &nbsp; return false;<br>
+&nbsp; }<br>
+&nbsp; return std::less_equal&lt;&gt;()(begin, ptr) &amp;&amp;
+std::less&lt;&gt;()(ptr, end);<br>
+}</code>
+</blockquote>
+<h3>Limitations</h3>
+<p>At runtime, this targets only the platforms that Boost supports, which does
+not include implementations where two arrays of <code>T</code> may be
+interleaved.</p>
+<h2>Proposed Wording</h2>
+<p>All changes are relative to <a href="#N4971">N4971</a>.</p>
+<p>1. Insert into 20.2.2 [memory.syn] as follows:</p>
+<blockquote>
+<code>
+// [pointer.conversion], pointer conversion<br>
+template &lt;class T&gt;
+constexpr T* to_address(T* p) noexcept;<br>
+template &lt;class Ptr&gt;
+constexpr auto to_address(const Ptr&amp; p) noexcept;<br>
+<br>
+<ins>// [pointer.range.check], pointer range check<br>
+template &lt;class T&gt;
+constexpr bool
+pointer_in_range(const T* ptr, const T* begin, const T* end);</ins>
+</code>
+</blockquote>
+<p>2. Insert after 20.2.4 [pointer.conversion] as follows:</p>
+<blockquote class="insert">
+<strong>20.2.5 Pointer range check [pointer.range.check]</strong>
+<dl>
+<dt><code>template &lt;class T&gt;
+constexpr bool
+pointer_in_range(const T* ptr, const T* begin, const T* end);</code></dt>
+<dd>
+<p><em>Mandates:</em> <code>T</code> is not a function type.</p>
+<p><em>Preconditions:</em> <code>end</code> is reachable from
+<code>begin</code>.</p>
+<p><em>Returns:</em> As if:</p>
+<blockquote>
+<code> for (; begin != end; ++begin) {<br>
+&nbsp; if (begin == ptr) {<br>
+&nbsp; &nbsp; return true;<br>
+&nbsp; }<br>
+}<br>
+return false;</code>
+</blockquote>
+<p><em>Recommended practice:</em> Implementations should be O(1) on platforms
+when possible.</p>
+</dd>
+</dl>
+</blockquote>
+<h2>Acknowledgments</h2>
+<p>Peter Dimov and Jens Maurer provided feedback that improved the first
+revision of this paper. Peter Dimov also reviewed the Boost implementation.</p>
+<h2>References</h2>
+<ul>
+<li id="#N4971">N4971, Working Draft, Standard for Programming Language C++,
+<br>
+<a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/n4971.pdf">
+https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/n4971.pdf</a>
+</li>
+</ul>
+</body>
+</html>
